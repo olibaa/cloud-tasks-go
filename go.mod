@@ -1,6 +1,6 @@
 module cloud-tasks-go
 
-go 1.21
+go 1.23
 
 require (
 	cloud.google.com/go/cloudtasks v1.12.4
