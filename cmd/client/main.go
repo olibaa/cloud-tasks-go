@@ -12,7 +12,7 @@ import (
 
 func createTasks(numTasks int) error {
 	ctx := context.Background()
-	
+
 	client, err := cloudtasks.NewClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %v", err)
@@ -25,29 +25,42 @@ func createTasks(numTasks int) error {
 	queueName := os.Getenv("GCP_QUEUE_NAME")
 	endpointURL := os.Getenv("TASK_ENDPOINT_URL")
 	sleepDuration := os.Getenv("TASK_SLEEP_DURATION")
-	
+	serviceAccountEmail := os.Getenv("GCP_SERVICE_ACCOUNT_EMAIL")
+
 	if projectID == "" || location == "" || queueName == "" || endpointURL == "" {
 		return fmt.Errorf("required environment variables not set: GCP_PROJECT_ID, GCP_LOCATION, GCP_QUEUE_NAME, TASK_ENDPOINT_URL")
 	}
-	
+
 	if sleepDuration == "" {
 		sleepDuration = "10"
 	}
-	
+
 	queuePath := fmt.Sprintf("projects/%s/locations/%s/queues/%s", projectID, location, queueName)
 	taskURL := fmt.Sprintf("%s/task?sleep=%s", endpointURL, sleepDuration)
-	
+
 	for i := 0; i < numTasks; i++ {
+		httpRequest := &cloudtaskspb.HttpRequest{
+			HttpMethod: cloudtaskspb.HttpMethod_POST,
+			Url:        taskURL,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: []byte(fmt.Sprintf(`{"user_id": "user_%d", "task_number": %d}`, i+1, i+1)),
+		}
+
+		// OIDCトークン認証を設定（サービスアカウントが指定されている場合）
+		if serviceAccountEmail != "" {
+			httpRequest.AuthorizationHeader = &cloudtaskspb.HttpRequest_OidcToken{
+				OidcToken: &cloudtaskspb.OidcToken{
+					ServiceAccountEmail: serviceAccountEmail,
+					Audience:            endpointURL, // エンドポイントURLをオーディエンスとして使用
+				},
+			}
+		}
+
 		task := &cloudtaskspb.Task{
 			MessageType: &cloudtaskspb.Task_HttpRequest{
-				HttpRequest: &cloudtaskspb.HttpRequest{
-					HttpMethod: cloudtaskspb.HttpMethod_POST,
-					Url:        taskURL,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: []byte(fmt.Sprintf(`{"user_id": "user_%d", "task_number": %d}`, i+1, i+1)),
-				},
+				HttpRequest: httpRequest,
 			},
 		}
 
@@ -60,10 +73,10 @@ func createTasks(numTasks int) error {
 		if err != nil {
 			return fmt.Errorf("failed to create task %d: %v", i, err)
 		}
-		
+
 		log.Printf("Created task %d: %s", i, createdTask.Name)
 	}
-	
+
 	return nil
 }
 
@@ -74,7 +87,7 @@ func main() {
 			log.Fatal("Usage: go run client.go [number_of_tasks]")
 		}
 	}
-	
+
 	log.Printf("Creating %d tasks...", numTasks)
 	if err := createTasks(numTasks); err != nil {
 		log.Fatal(err)
