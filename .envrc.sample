@@ -1,7 +1,7 @@
 export GCP_PROJECT_ID="your-project-id"
 export GCP_LOCATION="asia-northeast1"
 export GCP_QUEUE_NAME="test-queue"
-export GCP_SERVICE_ACCOUNT_EMAIL="cloud-tasks-test@magicalpass-36383.iam.gserviceaccount.com"
+export GCP_SERVICE_ACCOUNT_EMAIL="cloud-tasks-test@test.iam.gserviceaccount.com"
 export TASK_ENDPOINT_URL="https://your-service-url.run.app"
 export TASK_SLEEP_DURATION="10"
 export PORT="8080"
